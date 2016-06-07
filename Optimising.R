@@ -10,19 +10,16 @@ library(xlsx)
 # The following code is used to load the data from different sources into the R environement
 
 setwd("~")
-Discount.Yield.Curve <- read.xlsx(file = "Desktop/Case Study/Case study data.xlsx",sheetIndex = 1,header = T)
-Mortality.Rates <- read.xlsx(file = "Desktop/Case Study/Case study data.xlsx",sheetIndex = 2,header = T)
-Policy.Records <- read.xlsx(file = "Desktop/Case Study/Case study data.xlsx",sheetIndex = 3,header = T)
+Discount.Yield.Curve <- read.xlsx(file = "Desktop/Case Study/Case Study Data/Case study data.xlsx",sheetIndex = 1,header = T)
+Mortality.Rates <- read.xlsx(file = "Desktop/Case Study/Case Study Data/Case study data.xlsx",sheetIndex = 2,header = T)
+Policy.Records <- read.xlsx(file = "Desktop/Case Study/Case Study Data/Case study data.xlsx",sheetIndex = 3,header = T)
 
 
-# for(i in 1:3) Policy.Records <- rbind(Policy.Records,Policy.Records)
-# Policy.Records$Policy.Number <- as.numeric(rownames(Policy.Records))
 
 
 
 
 ##### optimise level of premium ##############################################.
-
 level.of.premium <- function(level.premium, Policy.Number){
   
   #### Policy Data ###############################################################################
@@ -76,6 +73,7 @@ level.of.premium <- function(level.premium, Policy.Number){
 
 
 
+
 #### Set Parameter #############################################################################.
 # the following code is used to set global parameters
 
@@ -90,28 +88,114 @@ Year.Interval <- sapply(projected.years-1, function(i) paste0("[",i,",",i+1,"]")
 
 
 
-#### Optimising ####################### Finding Bottlenecks ################################################################################.
-
-optimising.range <- c(0,130)
-tolerance <- 0.01
 
 
-# simple optimisation
+
+
+
+
+#### Optimising #####################################################################################################.
+# to be able to optimise, we need to know how we should optimise
+# 
+# It would be possible to calculate the optimas with a equation-system, but R can not calculate analytically.
+# Therefore, normal optimisations are probably the best choice
+# 
+# We have some different possibilities for optimisation codes and try to find the fastest possible
+
+
+
+#### Optimisation methods #####################################
+# To find the fastest optimisation, we need to
+#   calculate all the possibilites we have and compare them
+
+# The apply-loop is added to calculate the optimas multiple times
+#  this may take a while but the time predictino is more accurate 
+#  This apply-loop is not built to be specifically fast, because it will be run only once.
+calc.time.table <- sapply(1:2, function(i){
+  
+  
+  
+  ## 1. optim()
+  # optim() offers 6 different methods, which we will all run trough
+  methods <- c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN", "Brent")
+  method.list <- lapply(methods, function(j){
+    info <- list()
+    start.time <- Sys.time()
+    info$values <- sapply(1: nrow(Policy.Records), function(i) {
+      optim(par= 40, fn= level.of.premium, Policy.Number= i, method= j, lower= 0, upper= 200)$par
+    })
+    info$time.difference <- Sys.time()-start.time
+    info
+  })
+  names(method.list) <- methods
+  calc.time <- sapply(1:length(method.list), function(i) as.numeric(method.list[[i]][2]))
+  
+  
+  
+  ## 2. optimise()
+  # optmise() only has one mehtod
+  optimising.range <- c(0,130)
+  tolerance <- 0.01
+  
+  start.time <- Sys.time()
+  sapply(1: nrow(Policy.Records), function(i) {
+    optimise(f = level.of.premium,optimising.range,tol = tolerance, i)$minimum })
+  time.difference <- Sys.time()-start.time
+  
+  # Add the optimise method to the others
+  calc.time <- c(calc.time,time.difference)
+  methods <- c(methods,"optim")
+  calc.time
+  
+  
+  
+}) # end of apply-loop
+
+
+
+
+## calculate the mean over the different cases
+calc.time.mean <- rowMeans(calc.time.table)
+
+
+## Plot the comparison of the calculation speeds
+library(plotly)
+m = list( l = 110, r = 150, b = 0, t = 100, pad = 4 )
+plot_ly(x=calc.time.mean, y=methods, mode = "markers", marker = list(color = "blue")) %>%
+  layout( autosize = F, margin = m, title = "Calculation speed per method",
+          yaxis = list(title = "Method"), xaxis = list(title = "Calculation time"))
+
+# We conculte from the graphic, that optim() has the best performance
+
+
+
+
+
+#### Optimising loops ###############################################
+# The optimisation needs to run over multiple policies, for which we use a loop
+# this loop can be optimised with different methods, which we will compare
+
+
+
+## simple optimisation
 sapply(Policy.Records$Policy.Number, function(i){
   optimise(f = level.of.premium,optimising.range,tol = tolerance, i)$minimum
 })
 
 
-
-# multicore calculation
+## multicore calculation (foreach-loop)
+# a foreeach.loop distributes tasks over all available cores on the computer
 require(parallel)
 require(doMC)
 registerDoMC(cores=detectCores())
 level.premium.list <- foreach(i = Policy.Records$Policy.Number) %dopar% optimise(f = level.of.premium,optimising.range,tol = tolerance, i)$minimum
-(level.premium <- Reduce(c,level.premium))
+(level.premium <- Reduce(c,level.premium.list))
 
 
-# compiling functions
+
+## compiling functions
+# R is a programmlanguage, where the code is computed, as it is compiled
+# with cmpfun we manipulate functions so that they are first compiled and the computed (just as in C++)
 library(compiler)
 level.of.premium.compiler <- cmpfun(level.of.premium)
 level.premium.list <- foreach(i = Policy.Records$Policy.Number) %dopar% 
@@ -121,7 +205,9 @@ level.premium.list <- foreach(i = Policy.Records$Policy.Number) %dopar%
 
 
 
-# comaprison
+
+
+## comaprison
 library(microbenchmark)
 compare <- microbenchmark(
   sapply(Policy.Records$Policy.Number, function(i){ optimise(f = level.of.premium,optimising.range,tol = tolerance, i)$minimum }),
@@ -131,7 +217,7 @@ compare <- microbenchmark(
 )
 
 library(ggplot2)
-plot(compare)
+plot(compare,col="lightblue")
 
 
 
@@ -140,20 +226,18 @@ plot(compare)
 
 
 
-#### Finding Bottlenecks ################################################################################.
+#### Find Bottlenecks ################################################################################.
 
 Rprof("out.out")
 
-level.of.premium.compiler <- cmpfun(level.of.premium)
 level.premium.list <- foreach(i = Policy.Records$Policy.Number) %dopar% 
   optimise(f = level.of.premium.compiler,optimising.range,tol = tolerance, i)$minimum
-(level.premium <- Reduce(c,level.premium.list))
 
 Rprof(NULL)
 summaryRprof("out.out")
 
 
-
+# different analysation
 proftable <- function(file, lines = 10) {
   profdata <- readLines(file)
   interval <- as.numeric(strsplit(profdata[1L], "=")[[1L]][2L]) / 1e+06
@@ -196,6 +280,11 @@ proftable <- function(file, lines = 10) {
   invisible(stacktable)
 }
 proftable("out.out")
+
+
+
+
+
 
 
 

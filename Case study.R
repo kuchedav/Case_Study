@@ -12,9 +12,9 @@ library(xlsx)
 # The following code is used to load the data from different sources into the R environement
 
 setwd("~")
-Discount.Yield.Curve <- read.xlsx(file = "Desktop/Case Study/Case study data.xlsx",sheetIndex = 1,header = T)
-Mortality.Rates <- read.xlsx(file = "Desktop/Case Study/Case study data.xlsx",sheetIndex = 2,header = T)
-Policy.Records <- read.xlsx(file = "Desktop/Case Study/Case study data.xlsx",sheetIndex = 3,header = T)
+Discount.Yield.Curve <- read.xlsx(file = "Desktop/Case Study/Case Study Data/Case study data.xlsx",sheetIndex = 1,header = T)
+Mortality.Rates <- read.xlsx(file = "Desktop/Case Study/Case Study Data/Case study data.xlsx",sheetIndex = 2,header = T)
+Policy.Records <- read.xlsx(file = "Desktop/Case Study/Case Study Data/Case study data.xlsx",sheetIndex = 3,header = T)
 
 
 
@@ -122,7 +122,7 @@ data.table <- data.frame(data.table.projected.year, rbind(rep(NA,ncol(data.table
 Book <- createWorkbook()
 Case.Study <- createSheet(wb=Book, sheetName="Case Study")
 addDataFrame(x=data.table, sheet=Case.Study)
-saveWorkbook(Book, "Desktop/Case Study/data.table.xlsx")
+saveWorkbook(Book, "Desktop/Case Study/Case Study Data/data.table.xlsx")
 
 
 
