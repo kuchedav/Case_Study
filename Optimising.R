@@ -94,7 +94,7 @@ Year.Interval <- sapply(projected.years-1, function(i) paste0("[",i,",",i+1,"]")
 
 
 
-#### Optimising #####################################################################################################.
+#### Optimisation #####################################################################################################.
 # to be able to optimise, we need to know how we should optimise
 # 
 # It would be possible to calculate the optimas with a equation-system, but R can not calculate analytically.
@@ -309,14 +309,26 @@ Analysis1 <- data.frame(Policy.Records$Policyholder.Age,level.premium)
 lm.erg <- lm(level.premium ~ Policy.Records.Policyholder.Age, data=Analysis1)
 summary(lm.erg)
 
-plot(Policy.Records$Policyholder.Age,level.premium)
-abline(lm.erg, col="red4")
+plot(Policy.Records$Policyholder.Age,level.premium, xlim= c(0,70), ylim= c(0,120))
+# abline(lm.erg, col="red4")
+for(i in 8:12) lines(smooth.spline(x=Policy.Records$Policyholder.Age,y=level.premium,spar = 0.6),col=2)
+lines(predict(smooth.spline(x=Policy.Records$Policyholder.Age,y=level.premium,spar = 0.6),1:20))
+lines(predict(smooth.spline(x=Policy.Records$Policyholder.Age,y=level.premium,spar = 0.6),60:70))
 
 
 
-#### level premium / ~ #############################.
+plot(log(Mortality.Rates),type="l")
 
-Analysis2 <- data.frame(Policy.Records$Policyholder.Age,level.premium)
+
+
+
+
+
+
+
+
+
+
 
 
 

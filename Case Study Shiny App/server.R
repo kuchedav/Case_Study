@@ -113,6 +113,7 @@ function(input, output) {
                      ,width = 500
         )
       })
+      
     }
     
     ##### Input Data Tables ################################################.
@@ -128,18 +129,37 @@ function(input, output) {
         Discount.Yield.Curve()
       }))
     }
-
+    
     
     output$data.table <- renderTable({
       data.table()
     })
     
     output$levelpremium.age.plot <- renderPlot({
-      plot(Policy.Records()[,1],level.premium.optimised())
+      plot(Policy.Records()[,2],level.premium.optimised(), xlab = "Age", ylab = "Level of premium", xlim = c(0,70), ylim = c(0,130),
+           main = "Comparison of the age against the Level of premium")
+      
+      if(input$analysis == "Spline"){
+        for(i in 8:12) lines(smooth.spline(x=Policy.Records()[,2],y=level.premium.optimised(),spar = 0.65),col=2)
+        lines(predict(smooth.spline(x=Policy.Records()[,2],y=level.premium.optimised(),spar = 0.65),1:20))
+        lines(predict(smooth.spline(x=Policy.Records()[,2],y=level.premium.optimised(),spar = 0.65),60:70))
+      }else{
+        lm.erg <- lm(level.premium.optimised() ~ Policy.Records()[,2])
+        summary(lm.erg)
+        abline(lm.erg, col="red4")
+      }
     })
     # clicked points
     output$plot.brush.points <- renderPrint({
-      input$plot_brush
+      policy.output <- subset(Policy.Records(), Policy.Records()[,2] > input$plot_brush$xmin &  Policy.Records()[,2] < input$plot_brush$xmax)
+      
+      premium.ouput <- subset(level.premium.optimised(), Policy.Records()[,2] > input$plot_brush$xmin &
+                                Policy.Records()[,2] < input$plot_brush$xmax)
+      # premium.ouput <- subset(level.premium.optimised, Policy.Records[,2] > 30 &
+      #                           Policy.Records[,2] < 60)
+      # Policy.Records[premium.ouput > 40 &  premium.ouput < 100,]
+      policy.output[premium.ouput > input$plot_brush$ymin &  premium.ouput < input$plot_brush$ymax,]
+      policy.output
     })
     
   }
